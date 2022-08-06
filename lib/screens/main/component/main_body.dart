@@ -10,14 +10,14 @@ import 'dart:async';
 import 'package:audioplayers/notifications.dart';
 import 'package:music_app/components/slider_gradiunt.dart';
 import 'package:music_app/main.dart';
-import 'package:music_app/main/main_view_model/main_view_model.dart';
+import 'package:music_app/screens/main/main_view_model/main_view_model.dart';
 import 'package:music_app/utils/app_constant/colors.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:sleek_circular_slider/sleek_circular_slider.dart';
 
 class MainBody extends ConsumerStatefulWidget {
-  MainBody({Key? key}) : super(key: key);
-
+  MainBody({Key? key,required this.index}) : super(key: key);
+int index=0;
   @override
   ConsumerState<ConsumerStatefulWidget> createState() {
     return MainState();
@@ -27,7 +27,7 @@ class MainBody extends ConsumerStatefulWidget {
 class MainState extends ConsumerState<MainBody>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  LinearGradient gradient = LinearGradient(colors: <Color>[
+  LinearGradient gradient = const LinearGradient(colors: <Color>[
     Color(0XFFFFEE25),
     Color(0XFFFEE820),
     Color(0XFFFDD60E),
@@ -49,7 +49,6 @@ class MainState extends ConsumerState<MainBody>
   Duration? _duration;
   Duration? _position;
   final OnAudioQuery _audioQuery = OnAudioQuery();
-  List<SongModel> deviceSongs = [];
 
   late List<FileSystemEntity> _files;
   final List<FileSystemEntity> _songs = [];
@@ -61,10 +60,8 @@ class MainState extends ConsumerState<MainBody>
   @override
   void initState() {
     super.initState();
-    OnAudioQuery();
-
-    requestStoragePermission();
-
+    // OnAudioQuery();
+    // requestStoragePermission();
     _controller = AnimationController(
       duration: const Duration(milliseconds: 15000),
       vsync: this,
@@ -74,39 +71,33 @@ class MainState extends ConsumerState<MainBody>
 
   @override
   void dispose() {
-    super.dispose();
+    _controller.dispose();
+     super.dispose();
   }
 
-  getSongInfo() async {
-    List<SongModel> something = await OnAudioQuery().querySongs();
-    deviceSongs = something;
-    print("testt ${deviceSongs[0].id}");
-  }
-
-  getSongs() {
-    Directory dir = Directory('/storage/emulated/0/');
-    String mp3Path = dir.toString();
-    print(mp3Path);
-
-    _files = dir.listSync(recursive: true, followLinks: false);
-    for (FileSystemEntity entity in _files) {
-      String path = entity.path;
-      if (path.endsWith('.mp3')) _songs.add(entity);
-    }
-    print("testt ${_songs}");
-    print("testt ${_songs[0].path}");
-    print("tstLengh ${_songs.length}");
-  }
+  // getSongs() {
+  //   Directory dir = Directory('/storage/emulated/0/');
+  //   String mp3Path = dir.toString();
+  //   print(mp3Path);
+  //
+  //   _files = dir.listSync(recursive: true, followLinks: false);
+  //   for (FileSystemEntity entity in _files) {
+  //     String path = entity.path;
+  //     if (path.endsWith('.mp3')) _songs.add(entity);
+  //   }
+  //   print("testt ${_songs}");
+  //   print("testt ${_songs[0].path}");
+  //   print("tstLengh ${_songs.length}");
+  // }
 
   void requestStoragePermission() async {
-     if (!kIsWeb) {
+    if (!kIsWeb) {
       bool permissionStatus = await _audioQuery.permissionsStatus();
       if (!permissionStatus) {
         await _audioQuery.permissionsRequest();
       } else {
-        setState(() {
-          getSongInfo();
-        });
+        final viewModel = ref.watch(mainViewModelProvider);
+        viewModel.getSongList();
       }
     }
   }
@@ -115,42 +106,50 @@ class MainState extends ConsumerState<MainBody>
   Widget build(BuildContext context) {
     double _height = MediaQuery.of(context).size.height;
     final viewModel = ref.watch(mainViewModelProvider);
-    if (audioPlayer.playing) {
-      _controller.repeat();
-      if (_duration == null) {
-        _controller.reset();
-      }
-    } else {
-      _controller.stop();
-    }
-    if(audioPlayer.playing){
-      audioHandler.playbackState.listen((PlaybackState state) {
-        switch (state.processingState) {
-          case AudioProcessingState.idle:
-            null;
-            break;
-          case AudioProcessingState.loading:
-            null;
-            break;
-          case AudioProcessingState.buffering:
-            null;
-            break;
-          case AudioProcessingState.ready:
-            null;
-            break;
-          case AudioProcessingState.completed:
-            {
-              audioPlayer.pause();
-              audioHandler.pause();
-              audioPlayer.seek(Duration(milliseconds: 0),);
-              setState(() => _playerState = PlayerState.STOPPED);
-            }
-            ;
-            break;
-          case AudioProcessingState.error:
+    if(  audioHandler.queue.value.last.id==viewModel.deviceSongs[widget.index].id.toString()){
+      if (audioPlayer.playing) {
+        _controller.repeat();
+        if (_duration == null) {
+          _controller.reset();
         }
-      });
+      } else {
+        _controller.stop();
+      }
+    }else{
+      audioPlayer.stop();
+      audioHandler.stop();
+      _controller.stop();
+      audioPlayer.seek(Duration(milliseconds: 0),);
     }
+
+    // if(audioPlayer.playing){
+    //   audioHandler.playbackState.listen((PlaybackState state) {
+    //     switch (state.processingState) {
+    //       case AudioProcessingState.idle:
+    //         null;
+    //         break;
+    //       case AudioProcessingState.loading:
+    //         null;
+    //         break;
+    //       case AudioProcessingState.buffering:
+    //         null;
+    //         break;
+    //       case AudioProcessingState.ready:
+    //         null;
+    //         break;
+    //       case AudioProcessingState.completed:
+    //         {
+    //           audioPlayer.pause();
+    //           audioHandler.pause();
+    //           audioPlayer.seek(Duration(milliseconds: 0),);
+    //           setState(() => _playerState = PlayerState.STOPPED);
+    //         }
+    //         ;
+    //         break;
+    //       case AudioProcessingState.error:
+    //     }
+    //   });
+    // }
 
     return Container(
       height: _height,
@@ -244,7 +243,9 @@ class MainState extends ConsumerState<MainBody>
                                   borderRadius: BorderRadius.circular(100),
                                   child: QueryArtworkWidget(
                                     keepOldArtwork: true,
-                                    id:deviceSongs.isNotEmpty? deviceSongs[0].id:0,
+                                    id: viewModel.deviceSongs.isNotEmpty
+                                        ? viewModel.deviceSongs[widget.index].id
+                                        : 0,
                                     type: ArtworkType.AUDIO,
                                   ),
                                 )),
@@ -283,8 +284,9 @@ class MainState extends ConsumerState<MainBody>
               Container(
                 margin: EdgeInsets.only(top: _height * .05),
                 child: Text(
-                  deviceSongs.isNotEmpty?
-                  deviceSongs[0].title:"Unknown",
+                  viewModel.deviceSongs.isNotEmpty
+                      ? viewModel.deviceSongs[widget.index].title
+                      : "Unknown",
                   style: Theme.of(context)
                       .textTheme
                       .headline2!
@@ -294,8 +296,9 @@ class MainState extends ConsumerState<MainBody>
               Container(
                 margin: EdgeInsets.only(top: _height * .01),
                 child: Text(
-                  deviceSongs.isNotEmpty?
-                  deviceSongs[0].artist ?? "":"Unknown",
+                  viewModel.deviceSongs.isNotEmpty
+                      ? viewModel.deviceSongs[widget.index].artist ?? ""
+                      : "Unknown",
                   style: Theme.of(context)
                       .textTheme
                       .headline5!
@@ -354,10 +357,14 @@ class MainState extends ConsumerState<MainBody>
                           setState(() => _playerState = PlayerState.PLAYING);
                           final mediaItems = [
                             MediaItem(
-                              id: "1",
-                              title: "The best moment of the life",
-                              album: ' ',
-                              extras: {'url':deviceSongs.isNotEmpty? deviceSongs[0].uri:""},
+                              id: viewModel.deviceSongs[widget.index].id.toString(),
+                              title:viewModel.deviceSongs[widget.index].title,
+                              album: viewModel.deviceSongs[widget.index].album,
+                              extras: {
+                                'url': viewModel.deviceSongs.isNotEmpty
+                                    ? viewModel.deviceSongs[widget.index].uri
+                                    : ""
+                              },
                             )
                           ];
                           audioHandler.addQueueItems(mediaItems);
@@ -446,14 +453,13 @@ class MainState extends ConsumerState<MainBody>
       setState(() {
         _duration = duration;
       });
-      print('dddd $duration');
     });
     _positionSubscription =
-        audioPlayer.positionStream.listen((p) => setState(() {
-              _position = p;
+        audioPlayer.positionStream.listen((p) =>
+              _position = p);
               // final viewModel = ref.watch(getAudioBookDetailViewModelProvider);
               // viewModel.podcastAudioListened(_position!);
-            }));
+
 
     audioPlayer.playerStateStream.listen(
       (event) {
